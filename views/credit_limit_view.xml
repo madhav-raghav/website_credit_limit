@@ -1,0 +1,165 @@
+<?xml version="1.0"?>
+<openerp>
+    <data>
+        <!-- Credit limit Form View  -->
+        <record model="ir.ui.view" id="credit_limit_form_view">
+        <field name="name">Credit Limit Request Form</field>
+        <field name="model">creditlimit.request</field>
+        <field name="arch" type="xml">
+            <form string="Credit Limit Request Form">
+                <header>
+                   <button name="approved_by_manager" type="object" states="draft" string="Manager Approval" groups="base.group_user"/>
+ 	                <button name="cancel_state" states="draft" type="object" string="Cancel Request" groups="base.group_user"/>
+                    <field name="state" widget="statusbar" readonly="1"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" placeholder="Describe the Credit holdar.."/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <!-- Preload all the partner's information -->
+                            <field name="partner_id" string="Customer" on_change="onchange_partner_id(partner_id)"/>
+                            <field name="credit_limit"/>
+                            <label for="street" string="Address"/>
+                            <div>
+                                <field name="street" placeholder="Street..."/>
+                                <field name="street2"/>
+                                <div class="address_format">
+                                    <field name="city" placeholder="City" style="width: 40%%"/>
+                                    <field name="state_id" options='{"no_open": True}' placeholder="State" style="width: 24%%"/>
+                                    <field name="zip" placeholder="ZIP" style="width: 34%%"/>
+                                </div>
+                                <field name="country_id" placeholder="Country" options='{"no_open": True, "no_create": True}'/>
+                            </div>
+                        </group>
+                        <group>
+                            <label for="contact_name"/>
+                            <div>
+                                <field name="contact_name" class="oe_inline"/><span attrs="{'invisible': [('title', '=', '')]}">, </span>
+                                <field name="title" placeholder="Title" domain="[('domain', '=', 'contact')]" class="oe_inline" options='{"no_open": True}'/>
+                            </div>
+                            <field name="email_from" widget="email"/>
+                            <field name="phone"/>
+                            <field name="mobile"/>
+                            <field name="fax"/>
+                        </group>
+                        <group>
+                            <field name="user_id" context="{'default_groups_ref': ['base.group_user', 'base.group_partner_manager', 'base.group_sale_salesman_all_leads'] }"/>
+                        </group>
+                    </group>
+                    <notebook colspan="4">
+                    <page string="Internal Notes">
+                        <field name="description"/>
+                    </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+        </record>
+
+        <!-- Credit Limit Tree View -->
+        <record model="ir.ui.view" id="creditlimit_tree_view">
+            <field name="name">Credit Limit Request</field>
+            <field name="model">creditlimit.request</field>
+            <field name="arch" type="xml">
+                <tree string="Creaditor">
+                    <field name="create_date"/>
+                    <field name="name"/>
+                    <field name="contact_name"/>
+                    <field name="phone"/>
+                    <field name="partner_id"/>
+                    <field name="credit_limit"/>
+                </tree>
+            </field>
+        </record>
+
+
+        <!-- CRM Lead Calendar View -->
+        <record model="ir.ui.view" id="crm_case_calendar_view_leads">
+            <field name="name">CRM - Leads Calendar</field>
+            <field name="model">crm.lead</field>
+            <field name="priority" eval="2"/>
+            <field name="arch" type="xml">
+                <calendar string="Leads Generation"
+                    date_start="date_action" color="user_id">
+                    <field name="name"/>
+                    <field name="partner_name"/>
+                </calendar>
+            </field>
+        </record>
+
+
+        <!-- CRM Lead Search View -->
+        <record id="view_creditlimit_filter" model="ir.ui.view">
+            <field name="name">Credit Limit Request Search</field>
+            <field name="model">creditlimit.request</field>
+            <field name="arch" type="xml">
+                <search string="Creditor">
+                    <field name="name" string="Customer" filter_domain="['|','|','|',('partner_name','ilike',self),('email_from','ilike',self),('contact_name','ilike',self),('name','ilike',self)]"/>
+                    <field name="user_id"/>
+                    <field name="partner_id" operator="child_of"/>
+                    <field name="create_date"/>
+                    <field name="country_id"/>
+                    <separator/>
+                    <filter string="My Request"
+                            domain="[('user_id','=',uid)]"
+                            help="Request that are assigned to me"/>
+                    <filter string="Unassigned" name="unassigned"
+                            domain="[('user_id','=', False)]"
+                            help="No salesperson"/>
+                    <separator />
+                    <group expand="0" string="Group By">
+                        <filter string="Salesperson" domain="[]" context="{'group_by':'user_id'}"/>
+                        <filter string="Stage" domain="[]" context="{'group_by':'state'}"/>
+                        <filter string="Customer" help="Partner" domain="[]" context="{'group_by':'partner_id'}"/>
+                        <filter string="Creation Month" domain="[]" context="{'group_by':'create_date'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+        
+        <record id="open_view_creditlimit_request_tree" model="ir.actions.act_window">
+            <field name="name">Credit Limit Request</field>
+            <field name="res_model">creditlimit.request</field>
+            <field name="view_type">tree</field>
+            <field name="view_mode">tree,form</field>
+            <field name="view_id" ref="creditlimit_tree_view"/>
+            <field name="search_view_id" ref="view_creditlimit_filter"/>
+        </record>
+
+        <record id="open_view_creditlimit_request_list" model="ir.actions.act_window">
+            <field name="name">Credit Limit Request</field>
+            <field name="res_model">creditlimit.request</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">form,tree</field>
+            <field name="view_id" eval="credit_limit_form_view"/>
+            <field name="search_view_id" ref="view_creditlimit_filter"/>
+        </record>
+
+        <record id="open_view_creditlimit_request_my" model="ir.actions.act_window">
+            <field name="name">Credit Limit Request</field>
+            <field name="res_model">creditlimit.request</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[]</field>
+            <field name="context">{}</field>
+            <field name="view_id" eval="False"/>
+            <field name="search_view_id" ref="view_creditlimit_filter"/>
+            <field name="help" type="html">
+              <p class="oe_view_nocontent_create">
+                Click to add a new new credit limti request.
+              </p><p>
+              </p>
+            </field>
+        </record>
+
+
+  <menuitem action="open_view_creditlimit_request_my" id="menu_creditlimit_request" parent="base.menu_sales" sequence="7"/>
+
+        
+
+
+    </data>
+</openerp>

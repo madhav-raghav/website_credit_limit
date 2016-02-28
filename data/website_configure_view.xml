@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data noupdate="1">
+        <record id="menu_creditlimit" model="website.menu">
+            <field name="name">Wallet</field>
+            <field name="url">/page/creditlimit</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" type="int">50</field>
+        </record>
+        <record id="action_open_website" model="ir.actions.act_url">
+            <field name="name">Website Credit Limit Form</field>
+            <field name="target">self</field>
+            <field name="url">/page/creditlimit</field>
+        </record>
+        <record id="base.open_menu" model="ir.actions.todo">
+            <field name="action_id" ref="action_open_website"/>
+            <field name="state">open</field>
+        </record>
+    </data>
+</openerp>
