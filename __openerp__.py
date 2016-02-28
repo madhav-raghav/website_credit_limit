@@ -10,7 +10,7 @@ OpenERP Credit Limit Request Contact Form
 
         """,
     'author': 'Vipin Kumar Tripathi IN',
-    'depends': ['base','sale','website_partner','credit_controller','crm'],
+    'depends': ['base','sale','website_partner','crm'],
     'data': [
         #'data/website_crm_data.xml',
         'views/credit_limit_view.xml',
