@@ -20,74 +20,100 @@
 ##############################################################################
 
 from openerp.osv import fields,osv
+from openerp import api
 from openerp.tools.translate import _
 from datetime import datetime
 
 class creditlimit_request(osv.osv):
     _name='creditlimit.request'
     
+    def _make_journal_search(self, cr, uid, ttype, context=None):
+        journal_pool = self.pool.get('account.journal')
+        return journal_pool.search(cr, uid, [('type', '=', ttype)], limit=1)
+    
+    
+    def _get_journal(self, cr, uid, context=None):
+        if context is None: context = {}
+        ttype = context.get('type', 'bank')
+        if ttype in ('payment', 'receipt'):
+            ttype = 'bank'
+        res = self._make_journal_search(cr, uid, ttype, context=context)
+        return res and res[0] or False
+    
+    def _get_currency(self, cr, uid, context=None):
+        if context is None: context = {}
+        journal_pool = self.pool.get('account.journal')
+        journal_id = context.get('journal_id', False)
+        if journal_id:
+            if isinstance(journal_id, (list, tuple)):
+                # sometimes journal_id is a pair (id, display_name)
+                journal_id = journal_id[0]
+            journal = journal_pool.browse(cr, uid, journal_id, context=context)
+            if journal.currency:
+                return journal.currency.id
+        return self.pool.get('res.users').browse(cr, uid, uid, context=context).company_id.currency_id.id
+    
+    def _get_journal_currency(self, cr, uid, ids, name, args, context=None):
+        res = {}
+        for voucher in self.browse(cr, uid, ids, context=context):
+            res[voucher.id] = voucher.journal_id.currency and voucher.journal_id.currency.id or voucher.company_id.currency_id.id
+        return res
+    
+    def _get_period(self, cr, uid, context=None):
+        if context is None: context = {}
+        if context.get('period_id', False):
+            return context.get('period_id')
+        periods = self.pool.get('account.period').find(cr, uid, context=context)
+        return periods and periods[0] or False
     _columns={
            'partner_id': fields.many2one('res.partner', 'Partner', ondelete='set null',help="Linked partner (optional). Usually created when converting the lead."),
+        'bank_name':fields.selection([('HDFC','HDFC'),('ICICI','ICICI'),('SBI','SBI')],'Bank Name'),
+        'payment_date':fields.date('Payment Date'),
+        'request_date':fields.date('Request Date'),
+        'transection_id':fields.char('Cheque No. / Transection No'),
         'credit_limit':fields.float('Credit Limit Amount'),
-        'partner_name': fields.char("Customer Name", size=64,help='The name of the future partner company that will be created while converting the lead into opportunity', select=1),
-        'phone': fields.char("Phone", size=64),
-        'contact_name': fields.char('Contact Name', size=64),
-        'email_from': fields.char('Email', size=128, help="Email address of the contact"),
-        'name': fields.char('Subject'),
+        'contact_name': fields.char("Account Holder's Name", size=64),
+        'name': fields.char('Remark'),
         'state':fields.selection([('draft','Draft'),('approved','Approved'),('cancel','Cancel')],'State'),
-        'create_date':fields.datetime('Date'),
-         'description': fields.text('Notes'),
-         'user_id': fields.many2one('res.users', 'Salesperson'),
-        'street': fields.char('Street'),
-        'street2': fields.char('Street2'),
-        'zip': fields.char('Zip', size=24),
-        'city': fields.char('City'),
-        'state_id': fields.many2one("res.country.state", 'State'),
-        'country_id': fields.many2one('res.country', 'Country'),
-        'phone': fields.char('Phone'),
-        'fax': fields.char('Fax'),
-        'mobile': fields.char('Mobile'),
-        'function': fields.char('Function'),
-        'title': fields.many2one('res.partner.title', 'Title'),
-        'company_id': fields.many2one('res.company', 'Company'),
+        'user_id':fields.many2one('res.users','User'),
+        'journal_id':fields.many2one('account.journal', 'Journal', required=True, readonly=True, states={'draft':[('readonly',False)]}),
+        'currency_id': fields.function(_get_journal_currency, type='many2one', relation='res.currency', string='Currency', readonly=True, required=True),
+        'company_id':fields.many2one('res.company','Company'),
+        'period_id': fields.many2one('account.period', 'Period', required=True, readonly=True, states={'draft':[('readonly',False)]}),
+        'voucher_id':fields.many2one('account.voucher','Payment Voucher',readonly=True)
+
         }
-    _defauls={
+    _defaults={
+               'period_id': _get_period,
+              'journal_id':_get_journal,
               'state':'draft',
-              'create_date':fields.datetime.now,
+              'request_date':fields.datetime.now,
               'user_id':lambda s, cr, uid, c: uid,
+              'currency_id': _get_currency,
+              'company_id':lambda self,cr,uid,c: self.pool.get('res.company')._company_default_get(cr, uid, 'creditlimit.request',context=c)
               }
-    
+
     def approved_by_manager(self,cr,uid,ids,context=None):
         for rec in self.browse(cr,uid,ids,context=None):
-            credit_deatail_values = {}
-            credit_details_pool = self.pool.get('credit.details')
-            partner_pool = self.pool.get('res.partner')
-            parnter_id = partner_pool.search(cr,uid,[('email','=',rec.email_from)])
-            if not parnter_id:
-                raise osv.except_osv(_('Warning'), _(" %s Email Id customer not found.Please configure the customer Email address") % (rec.email_from))
-            credit_details_id = credit_details_pool.search(cr,uid,[('partner_id','in',parnter_id)])
-            import time
-            credit_deatail_values={
-                                   'name':parnter_id and parnter_id[0],
-                                   
-                                   }
-            if not credit_details_id:
-                credit_details_id = credit_details_pool.create(cr,uid,ids,credit_deatail_values,context=None)
-            credit_line_values={
-                                'credit_limit':rec.credit_limit or 0.0,
-                                'credit_details_id':credit_details_id and credit_details_id[0],
-                                'cl_applicable_date':str(time.strftime("%Y-%m-%d %H:%M:%S"))
-                                }    
-            self.pool.get('credit.limit.details').create(cr,uid,credit_line_values,context=None)
-            self.write(cr,uid,ids,{'state':'approved'})
+            voucher_pool = self.pool.get('account.voucher')
+            voucher_id = voucher_pool.create(cr, uid, {
+                                                            'type':'receipt', 
+                                                            'partner_id':rec.partner_id.id, 
+                                                            'amount':rec.credit_limit, 
+                                                            'account_id':rec.journal_id.default_credit_account_id.id , 
+                                                            'journal_id':rec.journal_id.id,
+                                                            'company_id':rec.company_id.id,
+                                                            'reference':rec.bank_name+'-'+rec.transection_id +'-'+rec.contact_name,
+                                                            }, context=context)
+            if voucher_id:
+                voucher_pool.proforma_voucher(cr, uid, [voucher_id], context=context)
+            rec.write({'state':'approved','voucher_id':voucher_id})
             return True
 
     def cancel_state(self,cr,uid,ids,context=None):
         self.write(cr,uid,ids,{'state':'cancel'})
         return True
 
-
-    
     def onchange_partner_id(self, cr, uid, ids, partner, context=None):
         """ This function returns value of partner email address based on partner
             :param part: Partner's id

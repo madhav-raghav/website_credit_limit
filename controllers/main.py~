@@ -21,8 +21,7 @@
 from openerp import http, SUPERUSER_ID
 from openerp.http import request
 from openerp.tools.translate import _
-import werkzeug.urls
-import werkzeug.wrappers
+from openerp import werkzeug
 
 class creditlimit(http.Controller):
 
